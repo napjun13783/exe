@@ -1,0 +1,12 @@
+[
+  { "id": 1, "name": "Room Spray Fresh เล็ก 30ml", "mood": "fresh", "type": "spray", "size": "30ml", "price": 89, "image": "images/fresh.jpg", "description": "สดชื่น โปร่งโล่ง ให้ความรู้สึกตื่นตัว พร้อมเริ่มวันใหม่" },
+  { "id": 2, "name": "Room Spray Fresh ใหญ่ 100ml", "mood": "fresh", "type": "spray", "size": "100ml", "price": 199, "image": "images/fresh.jpg", "description": "สดชื่น โปร่งโล่ง ให้ความรู้สึกตื่นตัว พร้อมเริ่มวันใหม่" },
+  { "id": 3, "name": "Room Spray Relax เล็ก 30ml", "mood": "relax", "type": "spray", "size": "30ml", "price": 89, "image": "images/relax.jpg", "description": "ผ่อนคลาย สงบ ปลดเปลื้องความเหนื่อยล้าเพื่อการพักผ่อน" },
+  { "id": 4, "name": "Room Spray Relax ใหญ่ 100ml", "mood": "relax", "type": "spray", "size": "100ml", "price": 199, "image": "images/relax.jpg", "description": "ผ่อนคลาย สงบ ปลดเปลื้องความเหนื่อยล้าเพื่อการพักผ่อน" },
+  { "id": 5, "name": "Room Spray Focus เล็ก 30ml", "mood": "focus", "type": "spray", "size": "30ml", "price": 89, "image": "images/focus.jpg", "description": "สร้างสมาธิ นิ่งสงบ ตัดความวุ่นวายรอบตัว" },
+  { "id": 6, "name": "Room Spray Focus ใหญ่ 100ml", "mood": "focus", "type": "spray", "size": "100ml", "price": 199, "image": "images/focus.jpg", "description": "สร้างสมาธิ นิ่งสงบ ตัดความวุ่นวายรอบตัว" },
+  { "id": 7, "name": "Room Spray Romance เล็ก 30ml", "mood": "romance", "type": "spray", "size": "30ml", "price": 89, "image": "images/romance.jpg", "description": "โรแมนติก อบอุ่น เติมเต็มช่วงเวลาพิเศษ" },
+  { "id": 8, "name": "Room Spray Romance ใหญ่ 100ml", "mood": "romance", "type": "spray", "size": "100ml", "price": 199, "image": "images/romance.jpg", "description": "โรแมนติก อบอุ่น เติมเต็มช่วงเวลาพิเศษ" },
+  { "id": 9, "name": "เทียนหอม Relax", "mood": "relax", "type": "candle", "size": "Standard", "price": 149, "image": "images/relax.jpg", "description": "แสงนวลตาพร้อมกลิ่นผ่อนคลาย สงบจิตใจ" },
+  { "id": 10, "name": "เทียนหอม Romance", "mood": "romance", "type": "candle", "size": "Standard", "price": 149, "image": "images/romance.jpg", "description": "สร้างบรรยากาศอบอุ่น หวานละมุนสำหรับคนพิเศษ" }
+]
