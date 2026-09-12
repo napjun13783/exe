@@ -3,16 +3,34 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Thank You | BareFit Underwear</title>
+  <title>Admin Dashboard | BareFit</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div class="container" style="text-align: center; padding-top: 6rem;">
-    <div class="form-card">
-      <h2 style="margin-bottom: 1rem;">Order Completed!</h2>
-      <p style="color: var(--text-muted); margin-bottom: 2rem;">ขอบคุณที่เลือกซื้อสินค้ากับ BareFit แอดมินได้รับออเดอร์ของคุณเรียบร้อยแล้ว และจะทำการจัดส่งสินค้าให้โดยเร็วที่สุด</p>
-      <a href="index.html" class="btn">กลับสู่หน้าแรก</a>
+  <div class="container" style="max-width: 1200px;">
+    <header class="nav-header">
+      <div class="brand-logo">BareFit Admin</div>
+      <a href="index.html" class="btn btn-secondary">ไปยังหน้าเว็บร้านค้า</a>
+    </header>
+
+    <h2 style="margin-bottom: 1.5rem;">รายการคำสั่งซื้อทั้งหมด</h2>
+    <div class="table-container">
+      <table id="ordersTable">
+        <thead>
+          <tr>
+            <th>วันเวลา</th>
+            <th>ชื่อลูกค้า</th>
+            <th>เบอร์โทร/Line</th>
+            <th>รายการสินค้า</th>
+            <th>จำนวนเงินรวม</th>
+            <th>ไซส์ / หมายเหตุ</th>
+          </tr>
+        </thead>
+        <tbody>
+        </tbody>
+      </table>
     </div>
   </div>
+  <script src="script.js"></script>
 </body>
 </html>
