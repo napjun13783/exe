@@ -63,9 +63,16 @@ document.addEventListener('DOMContentLoaded', () => {
         note: document.getElementById('note').value
       };
 
+      // แปลงข้อมูลให้อยู่ในรูปแบบ Form ก่อนส่งไป Google Sheet
+      const formData = new FormData();
+      for (const key in payload) {
+        formData.append(key, payload[key]);
+      }
+
       fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        body: JSON.stringify(payload)
+        mode: 'no-cors', // ป้องกันการบล็อก
+        body: formData
       }).then(() => {
         window.location.href = 'thankyou.html';
       }).catch(err => {
