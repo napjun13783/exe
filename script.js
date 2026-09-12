@@ -59,15 +59,14 @@ document.addEventListener('DOMContentLoaded', () => {
     orderForm.addEventListener('submit', (e) => {
       e.preventDefault();
       
-      // จัดเตรียมข้อมูลและตั้งชื่อหัวข้อเป็นภาษาไทยส่งไปให้ Google Sheet
+      // จัดเตรียมข้อมูลและตั้งชื่อหัวข้อให้ตรงกับหน้าเว็บเป๊ะๆ
       const formData = new FormData();
-      formData.append('ชื่อลูกค้า', document.getElementById('customerName').value);
-      formData.append('ที่อยู่จัดส่งและเบอร์โทร', document.getElementById('contact').value);
+      formData.append('ชื่อ-นามสกุล ผู้รับ', document.getElementById('customerName').value);
+      formData.append('เบอร์โทรศัพท์ / LINE ID', document.getElementById('contact').value);
       formData.append('รายการสินค้า', itemInput.value);
-      formData.append('ยอดรวม (บาท)', totalInput.value);
-      formData.append('หมายเหตุ', document.getElementById('note').value);
+      formData.append('ยอดรวมทั้งสิ้น (บาท)', totalInput.value);
+      formData.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', document.getElementById('note').value);
 
-      // สร้างเอฟเฟกต์เปลี่ยนปุ่มเป็นคำว่า "กำลังส่งข้อมูล..."
       const submitBtn = orderForm.querySelector('button[type="submit"]');
       const originalText = submitBtn.innerText;
       submitBtn.innerText = 'กำลังส่งคำสั่งซื้อ...';
@@ -79,7 +78,7 @@ document.addEventListener('DOMContentLoaded', () => {
         mode: 'no-cors',
         body: formData
       }).then(() => {
-        window.location.href = 'thankyou.html'; // ส่งเสร็จเด้งไปหน้าขอบคุณ
+        window.location.href = 'thankyou.html'; 
       }).catch(err => {
         console.error(err);
         alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
