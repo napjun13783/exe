@@ -4,7 +4,9 @@ const CSV_URL = 'YOUR_CSV_URL';
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   
-  // Product Page Logic
+  // ==========================================
+  // ส่วนหน้าแสดงสินค้า (Product Page)
+  // ==========================================
   const productList = document.getElementById('product-list');
   if (productList) {
     fetch('products.json').then(res => res.json()).then(products => {
@@ -13,7 +15,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const filterBar = document.getElementById('filter-bar');
       if (filterBar) {
-        // Highlight active button
         const activeBtn = filterBar.querySelector(`[data-mood="${moodFilter}"]`);
         if (activeBtn) activeBtn.classList.add('active');
 
@@ -45,7 +46,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Order Page Logic
+  // ==========================================
+  // ส่วนหน้าสั่งซื้อ (Order Page)
+  // ==========================================
   const orderForm = document.getElementById('orderForm');
   if (orderForm) {
     const itemInput = document.getElementById('items');
@@ -55,34 +58,40 @@ document.addEventListener('DOMContentLoaded', () => {
 
     orderForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      const payload = {
-        customerName: document.getElementById('customerName').value,
-        contact: document.getElementById('contact').value,
-        items: itemInput.value,
-        total: totalInput.value,
-        note: document.getElementById('note').value
-      };
-
-      // แปลงข้อมูลให้อยู่ในรูปแบบ Form ก่อนส่งไป Google Sheet
+      
+      // จัดเตรียมข้อมูลและตั้งชื่อหัวข้อเป็นภาษาไทยส่งไปให้ Google Sheet
       const formData = new FormData();
-      for (const key in payload) {
-        formData.append(key, payload[key]);
-      }
+      formData.append('ชื่อลูกค้า', document.getElementById('customerName').value);
+      formData.append('ที่อยู่จัดส่งและเบอร์โทร', document.getElementById('contact').value);
+      formData.append('รายการสินค้า', itemInput.value);
+      formData.append('ยอดรวม (บาท)', totalInput.value);
+      formData.append('หมายเหตุ', document.getElementById('note').value);
 
+      // สร้างเอฟเฟกต์เปลี่ยนปุ่มเป็นคำว่า "กำลังส่งข้อมูล..."
+      const submitBtn = orderForm.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerText;
+      submitBtn.innerText = 'กำลังส่งคำสั่งซื้อ...';
+      submitBtn.disabled = true;
+
+      // ส่งข้อมูลไป Google Sheet
       fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        mode: 'no-cors', // ป้องกันการบล็อก
+        mode: 'no-cors',
         body: formData
       }).then(() => {
-        window.location.href = 'thankyou.html';
+        window.location.href = 'thankyou.html'; // ส่งเสร็จเด้งไปหน้าขอบคุณ
       }).catch(err => {
         console.error(err);
-        alert('เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง');
+        alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
+        submitBtn.innerText = originalText;
+        submitBtn.disabled = false;
       });
     });
   }
 
-  // Admin Page Logic
+  // ==========================================
+  // ส่วนระบบหลังบ้าน Admin (ถ้ามี)
+  // ==========================================
   const ordersTableBody = document.querySelector('#ordersTable tbody');
   if (ordersTableBody) {
     fetch(CSV_URL).then(res => res.text()).then(csv => {
