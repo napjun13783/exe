@@ -5,7 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   
   // ==========================================
-  // ส่วนหน้าแสดงสินค้า (Product Page)
+  // ส่วนหน้าแสดงสินค้า
   // ==========================================
   const productList = document.getElementById('product-list');
   if (productList) {
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // ส่วนหน้าสั่งซื้อ (Order Page)
+  // ส่วนหน้าสั่งซื้อ (แก้ใหม่ ชัวร์ 100%)
   // ==========================================
   const orderForm = document.getElementById('orderForm');
   if (orderForm) {
@@ -59,13 +59,13 @@ document.addEventListener('DOMContentLoaded', () => {
     orderForm.addEventListener('submit', (e) => {
       e.preventDefault();
       
-      // จัดเตรียมข้อมูลและตั้งชื่อหัวข้อให้ตรงกับหน้าเว็บเป๊ะๆ
-      const formData = new FormData();
-      formData.append('ชื่อ-นามสกุล ผู้รับ', document.getElementById('customerName').value);
-      formData.append('เบอร์โทรศัพท์ / LINE ID', document.getElementById('contact').value);
-      formData.append('รายการสินค้า', itemInput.value);
-      formData.append('ยอดรวมทั้งสิ้น (บาท)', totalInput.value);
-      formData.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', document.getElementById('note').value);
+      // ใช้ URLSearchParams แทน FormData เพื่อให้ Google Sheet อ่านออกแน่นอน
+      const payload = new URLSearchParams();
+      payload.append('ชื่อ-นามสกุล ผู้รับ', document.getElementById('customerName').value);
+      payload.append('เบอร์โทรศัพท์ / LINE ID', document.getElementById('contact').value);
+      payload.append('รายการสินค้า', itemInput.value);
+      payload.append('ยอดรวมทั้งสิ้น (บาท)', totalInput.value);
+      payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', document.getElementById('note').value);
 
       const submitBtn = orderForm.querySelector('button[type="submit"]');
       const originalText = submitBtn.innerText;
@@ -76,7 +76,10 @@ document.addEventListener('DOMContentLoaded', () => {
       fetch(APPS_SCRIPT_URL, {
         method: 'POST',
         mode: 'no-cors',
-        body: formData
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: payload.toString()
       }).then(() => {
         window.location.href = 'thankyou.html'; 
       }).catch(err => {
@@ -89,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // ส่วนระบบหลังบ้าน Admin (ถ้ามี)
+  // ส่วน Admin
   // ==========================================
   const ordersTableBody = document.querySelector('#ordersTable tbody');
   if (ordersTableBody) {
