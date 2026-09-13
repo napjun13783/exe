@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const payload = new URLSearchParams();
       payload.append('ชื่อ-นามสกุล ผู้รับ', document.getElementById('customerName').value);
       payload.append('เบอร์โทรศัพท์ / LINE ID', document.getElementById('contact').value);
+      payload.append('ที่อยู่สำหรับจัดส่ง', document.getElementById('contact').value);
       payload.append('รายการสินค้า', itemInput.value);
       payload.append('ยอดรวมทั้งสิ้น (บาท)', totalInput.value);
       payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', document.getElementById('note').value);
