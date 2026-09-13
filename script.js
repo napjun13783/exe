@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // ส่วนหน้าสั่งซื้อ (แก้ใหม่ ชัวร์ 100%)
+  // ส่วนหน้าสั่งซื้อ (แก้ไขเรียงลำดับและแก้จุดผิดแล้ว)
   // ==========================================
   const orderForm = document.getElementById('orderForm');
   if (orderForm) {
@@ -59,12 +59,15 @@ document.addEventListener('DOMContentLoaded', () => {
     orderForm.addEventListener('submit', (e) => {
       e.preventDefault();
       
-      // ใช้ URLSearchParams แทน FormData เพื่อให้ Google Sheet อ่านออกแน่นอน
       const payload = new URLSearchParams();
       payload.append('ชื่อ-นามสกุล ผู้รับ', document.getElementById('customerName').value);
       payload.append('เบอร์โทรศัพท์ / LINE ID', document.getElementById('contact').value);
-      payload.append('ที่อยู่สำหรับจัดส่ง', document.getElementById('contact').value);
       payload.append('รายการสินค้า', itemInput.value);
+      
+      // แก้ไขเป็น id="address" ให้ดึงค่าช่องที่อยู่จริงๆ (ถ้าไม่มีให้เป็นค่าว่าง)
+      const addressField = document.getElementById('address');
+      payload.append('ที่อยู่สำหรับจัดส่ง', addressField ? addressField.value : '');
+      
       payload.append('ยอดรวมทั้งสิ้น (บาท)', totalInput.value);
       payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', document.getElementById('note').value);
 
