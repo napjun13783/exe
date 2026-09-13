@@ -1,4 +1,4 @@
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzBlg94PMLB_vBFGCDFpB2GCGQBFSJVWtK87vS13tp_ARl3W35MY8VaDgPSV7s2gmXs/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxcnJ0yU22AK7fkyzkgKcvQKx5O2DgqzS3ZMQQeC1kHOaX3w6yrNUu_J3vnF8HD1KyvEg/exec';
 const CSV_URL = 'YOUR_CSV_URL';
 
 document.addEventListener('DOMContentLoaded', () => {
