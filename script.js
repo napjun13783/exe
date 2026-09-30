@@ -10,7 +10,7 @@ const TELEGRAM_CHAT_ID = '-1004384220202';
 // ฟังก์ชันส่งข้อความเข้า Telegram
 async function sendTelegramNotification(message) {
   try {
-    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -21,6 +21,8 @@ async function sendTelegramNotification(message) {
         parse_mode: 'HTML',
       }),
     });
+    const data = await res.json();
+    console.log('Telegram API Response:', data);
   } catch (error) {
     console.error('Error sending Telegram notification:', error);
   }
