@@ -54,6 +54,7 @@ return;
 }
 
 productList.innerHTML = filtered.map(p => `
+${p.mood ? ${esc(p.mood)} : ''}
 ${p.image ? `
 
 ` : ''}
@@ -62,7 +63,6 @@ ${esc(p.name)}
 ${esc(p.description)}
 
 ฿${esc(p.price)}
-
 
 สั่งซื้อสินค้า
 
@@ -77,10 +77,13 @@ return res.json();
 })
 .then(products => {
 const moodFilter = urlParams.get('mood') || 'all';
-renderProducts(products, moodFilter);
 
+  // Active ปุ่ม Filter ตาม URL หรือ Default
   const filterBar = document.getElementById('filter-bar');
   if (filterBar) {
+    const activeBtn = filterBar.querySelector(`button[data-mood="${moodFilter}"]`) || filterBar.querySelector('button[data-mood="all"]');
+    if (activeBtn) activeBtn.classList.add('active');
+
     filterBar.addEventListener('click', (e) => {
       if (e.target.tagName === 'BUTTON') {
         filterBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
@@ -89,6 +92,8 @@ renderProducts(products, moodFilter);
       }
     });
   }
+
+  renderProducts(products, moodFilter);
 })
 .catch(err => {
   console.error(err);
