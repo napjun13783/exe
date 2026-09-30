@@ -7,13 +7,12 @@ const CSV_URL = 'YOUR_CSV_URL'; // ใส่ URL สำหรับดึง CSV
 const TELEGRAM_BOT_TOKEN = '8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0';
 const TELEGRAM_CHAT_ID = '-1004384220202';
 
-// ป้องกันตัวอักษรพิเศษทำลายรูปแบบ HTML ของ Telegram และป้องกัน XSS
+// แปลงตัวอักษรพิเศษป้องกัน HTML พัง (ใช้วิธีเบราว์เซอร์ ปลอดภัย ไม่เพี้ยนแน่)
 function esc(str) {
-  return String(str ?? '')
-    .replace(/&/g, '&')
-    .replace(//g, '>')
-    .replace(/"/g, '"')
-    .replace(/'/g, ''');
+  if (str === null || str === undefined) return '';
+  const d = document.createElement('div');
+  d.textContent = String(str);
+  return d.innerHTML;
 }
 
 // ฟังก์ชันส่งข้อความเข้า Telegram Channel
@@ -30,9 +29,6 @@ async function sendTelegramNotification(message) {
     });
     const data = await res.json();
     console.log('Telegram API Response:', data);
-    if (!data.ok) {
-      console.error('Telegram API Error Description:', data.description);
-    }
     return data.ok;
   } catch (error) {
     console.error('Error sending Telegram notification:', error);
@@ -73,7 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderProducts(products, filter) {
     if (!productList) return;
     const filtered = filter === 'all' ? products : products.filter(p => p.mood === filter);
-    productList.innerHTML = filtered.map(p => `${esc(p.mood)}
+    productList.innerHTML = filtered.map(p => `
+${esc(p.mood)}
 ${p.image ? `
 
 ` : ''}
@@ -162,7 +159,7 @@ const telegramMessage =
   `----------------------------------`;
 
 try {
-  // 1. ส่งเข้า Telegram ให้เรียบร้อย
+  // 1. ส่งเข้า Telegram
   await sendTelegramNotification(telegramMessage);
 
   // 2. บันทึกลง Google Sheet
@@ -173,7 +170,7 @@ try {
     body: payload.toString(),
   });
 
-  // หน่วงเวลาเล็กน้อย 300ms เพื่อให้แน่ใจว่าเบราว์เซอร์ยิง Request สำเร็จครบถ้วนก่อนเปลี่ยนหน้า
+  // 3. เปลี่ยนหน้าไป thankyou.html
   setTimeout(() => {
     window.location.href = 'thankyou.html';
   }, 300);
