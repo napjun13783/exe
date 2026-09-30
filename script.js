@@ -10,11 +10,10 @@ const TELEGRAM_CHAT_ID = '-1004384220202';
 // ป้องกันตัวอักษรพิเศษทำลายรูปแบบ HTML ของ Telegram และป้องกัน XSS
 function esc(str) {
   return String(str ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, '&')
+    .replace(//g, '>')
+    .replace(/"/g, '"')
+    .replace(/'/g, ''');
 }
 
 // ฟังก์ชันส่งข้อความเข้า Telegram Channel
@@ -31,8 +30,13 @@ async function sendTelegramNotification(message) {
     });
     const data = await res.json();
     console.log('Telegram API Response:', data);
+    if (!data.ok) {
+      console.error('Telegram API Error Description:', data.description);
+    }
+    return data.ok;
   } catch (error) {
     console.error('Error sending Telegram notification:', error);
+    return false;
   }
 }
 
@@ -69,135 +73,129 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderProducts(products, filter) {
     if (!productList) return;
     const filtered = filter === 'all' ? products : products.filter(p => p.mood === filter);
-    productList.innerHTML = filtered.map(p => `
-      <div class="product-card" data-mood="${esc(p.mood)}">
-        <span class="product-mood">${esc(p.mood)}</span>
-        <h3 class="product-name">${esc(p.name)}</h3>
-        <p class="product-desc">${esc(p.description)}</p>
-        <p class="product-price">฿${esc(p.price)}</p>
-        <a href="order.html?item=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price)}" class="btn-buy">สั่งซื้อสินค้า</a>
-      </div>
-    `).join('');
-  }
+    productList.innerHTML = filtered.map(p => `${esc(p.mood)}
+${p.image ? `
 
-  if (productList) {
-    fetch('products.json')
-      .then(res => res.json())
-      .then(products => {
-        const moodFilter = urlParams.get('mood') || 'all';
-        renderProducts(products, moodFilter);
-        
-        const filterBar = document.getElementById('filter-bar');
-        if (filterBar) {
-          const activeBtn = filterBar.querySelector(`[data-mood="${moodFilter}"]`);
-          if (activeBtn) activeBtn.classList.add('active');
+` : ''}
 
-          filterBar.addEventListener('click', (e) => {
-            if (e.target.tagName === 'BUTTON') {
-              filterBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-              e.target.classList.add('active');
-              renderProducts(products, e.target.dataset.mood);
-            }
-          });
-        }
-      })
-      .catch(err => console.error('Error loading products:', err));
-  }
+${esc(p.name)}
+${esc(p.description)}
 
-  // ==========================================
-  // 2. ส่วนหน้าสั่งซื้อ + ส่ง Google Sheet & Telegram
-  // ==========================================
-  const orderForm = document.getElementById('orderForm');
-  if (orderForm) {
-    const itemInput = document.getElementById('items');
-    const totalInput = document.getElementById('total');
-    if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
-    if (urlParams.has('price') && totalInput) totalInput.value = urlParams.get('price');
+฿${esc(p.price)}
 
-    orderForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
+สั่งซื้อสินค้า
 
-      const customerName = document.getElementById('customerName')?.value || '-';
-      const contact = document.getElementById('contact')?.value || '-';
-      const itemList = itemInput?.value || '-';
-      const addressField = document.getElementById('address');
-      const address = addressField ? addressField.value : '-';
-      const totalPrice = totalInput?.value || '0';
-      const note = document.getElementById('note')?.value || '-';
+`).join('');
+}
 
-      // จัดเตรียมข้อมูลส่งเข้า Google Sheet
-      const payload = new URLSearchParams();
-      payload.append('ชื่อ-นามสกุล ผู้รับ', customerName);
-      payload.append('เบอร์โทรศัพท์ / LINE ID', contact);
-      payload.append('รายการสินค้า', itemList);
-      payload.append('ที่อยู่สำหรับจัดส่ง', address);
-      payload.append('ยอดรวมทั้งสิ้น (บาท)', totalPrice);
-      payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', note);
+if (productList) {
+fetch('products.json')
+.then(res => res.json())
+.then(products => {
+const moodFilter = urlParams.get('mood') || 'all';
+renderProducts(products, moodFilter);
 
-      const submitBtn = orderForm.querySelector('button[type="submit"]');
-      const originalText = submitBtn ? submitBtn.innerText : '';
-      if (submitBtn) {
-        submitBtn.innerText = 'กำลังส่งคำสั่งซื้อ...';
-        submitBtn.disabled = true;
-      }
+  const filterBar = document.getElementById('filter-bar');
+  if (filterBar) {
+    const activeBtn = filterBar.querySelector(`[data-mood="${moodFilter}"]`);
+    if (activeBtn) activeBtn.classList.add('active');
 
-      // จัดข้อความสำหรับแจ้งเตือน Telegram
-      const telegramMessage =
-        `🛒 <b>มีออเดอร์ใหม่เข้า! (BareFit)</b>\n` +
-        `----------------------------------\n` +
-        `👤 <b>ผู้รับ:</b> ${esc(customerName)}\n` +
-        `📞 <b>ติดต่อ:</b> ${esc(contact)}\n` +
-        `📦 <b>สินค้า:</b> ${esc(itemList)}\n` +
-        `📍 <b>ที่อยู่:</b> ${esc(address)}\n` +
-        `💰 <b>ยอดรวม:</b> ${esc(totalPrice)} บาท\n` +
-        `📝 <b>หมายเหตุ:</b> ${esc(note)}\n` +
-        `----------------------------------`;
-
-      try {
-        // 1. ส่งเข้า Telegram ให้เรียบร้อย
-        await sendTelegramNotification(telegramMessage);
-
-        // 2. บันทึกลง Google Sheet
-        await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: payload.toString(),
-        });
-
-        // 3. ส่งข้อมูลสำเร็จแล้วเปลี่ยนหน้าไป thankyou.html
-        window.location.href = 'thankyou.html';
-      } catch (err) {
-        console.error('Submit Error:', err);
-        alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
-        if (submitBtn) {
-          submitBtn.innerText = originalText;
-          submitBtn.disabled = false;
-        }
+    filterBar.addEventListener('click', (e) => {
+      if (e.target.tagName === 'BUTTON') {
+        filterBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+        renderProducts(products, e.target.dataset.mood);
       }
     });
   }
+})
+.catch(err => console.error('Error loading products:', err));
+}
 
-  // ==========================================
-  // 3. ส่วน Admin แสดงรายการสั่งซื้อ
-  // ==========================================
-  const ordersTableBody = document.querySelector('#ordersTable tbody');
-  if (ordersTableBody && CSV_URL !== 'YOUR_CSV_URL') {
-    fetch(CSV_URL)
-      .then(res => res.text())
-      .then(csv => {
-        const rows = parseCSV(csv).slice(1).filter(r => r.join('').trim());
-        ordersTableBody.innerHTML = rows.reverse().map(cols => `
-          <tr>
-            <td>${esc(cols[0] || '')}</td>
-            <td>${esc(cols[1] || '')}</td>
-            <td>${esc(cols[2] || '')}</td>
-            <td>${esc(cols[3] || '')}</td>
-            <td>${esc(cols[4] || '')}</td>
-            <td>${esc(cols[5] || '')}</td>
-          </tr>
-        `).join('');
-      })
-      .catch(err => console.error('Error loading CSV orders:', err));
+// ==========================================
+// 2. ส่วนหน้าสั่งซื้อ + ส่ง Google Sheet & Telegram
+// ==========================================
+const orderForm = document.getElementById('orderForm');
+if (orderForm) {
+const itemInput = document.getElementById('items');
+const totalInput = document.getElementById('total');
+if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
+if (urlParams.has('price') && totalInput) totalInput.value = urlParams.get('price');
+
+orderForm.addEventListener('submit', async (e) => {
+e.preventDefault();
+
+const customerName = document.getElementById('customerName')?.value || '-';
+const contact = document.getElementById('contact')?.value || '-';
+const itemList = itemInput?.value || '-';
+const addressField = document.getElementById('address');
+const address = addressField ? addressField.value : '-';
+const totalPrice = totalInput?.value || '0';
+const note = document.getElementById('note')?.value || '-';
+
+// จัดเตรียมข้อมูลส่งเข้า Google Sheet
+const payload = new URLSearchParams();
+payload.append('ชื่อ-นามสกุล ผู้รับ', customerName);
+payload.append('เบอร์โทรศัพท์ / LINE ID', contact);
+payload.append('รายการสินค้า', itemList);
+payload.append('ที่อยู่สำหรับจัดส่ง', address);
+payload.append('ยอดรวมทั้งสิ้น (บาท)', totalPrice);
+payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', note);
+
+const submitBtn = orderForm.querySelector('button[type="submit"]');
+const originalText = submitBtn ? submitBtn.innerText : '';
+if (submitBtn) {
+  submitBtn.innerText = 'กำลังส่งคำสั่งซื้อ...';
+  submitBtn.disabled = true;
+}
+
+// จัดข้อความสำหรับแจ้งเตือน Telegram
+const telegramMessage =
+  `🛒 **มีออเดอร์ใหม่เข้า! (BareFit)**\n` +
+  `----------------------------------\n` +
+  `👤 **ผู้รับ:** ${esc(customerName)}\n` +
+  `📞 **ติดต่อ:** ${esc(contact)}\n` +
+  `📦 **สินค้า:** ${esc(itemList)}\n` +
+  `📍 **ที่อยู่:** ${esc(address)}\n` +
+  `💰 **ยอดรวม:** ${esc(totalPrice)} บาท\n` +
+  `📝 **หมายเหตุ:** ${esc(note)}\n` +
+  `----------------------------------`;
+
+try {
+  // 1. ส่งเข้า Telegram ให้เรียบร้อย
+  await sendTelegramNotification(telegramMessage);
+
+  // 2. บันทึกลง Google Sheet
+  await fetch(APPS_SCRIPT_URL, {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: payload.toString(),
+  });
+
+  // หน่วงเวลาเล็กน้อย 300ms เพื่อให้แน่ใจว่าเบราว์เซอร์ยิง Request สำเร็จครบถ้วนก่อนเปลี่ยนหน้า
+  setTimeout(() => {
+    window.location.href = 'thankyou.html';
+  }, 300);
+
+} catch (err) {
+  console.error('Submit Error:', err);
+  alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
+  if (submitBtn) {
+    submitBtn.innerText = originalText;
+    submitBtn.disabled = false;
   }
+}
 });
+}
+
+// ==========================================
+// 3. ส่วน Admin แสดงรายการสั่งซื้อ
+// ==========================================
+const ordersTableBody = document.querySelector('#ordersTable tbody');
+if (ordersTableBody && CSV_URL !== 'YOUR_CSV_URL') {
+fetch(CSV_URL)
+.then(res => res.text())
+.then(csv => {
+const rows = parseCSV(csv).slice(1).filter(r => r.join('').trim());
+ordersTableBody.innerHTML = rows.reverse().map(cols => `
