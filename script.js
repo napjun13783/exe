@@ -1,6 +1,31 @@
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzj4Fzm4wlYbfZkEOGG8CSSPJrDf9M1s67zHV1VFVUIHPJnF0hw8KmmNH72onmgJijysg/exec';
 const CSV_URL = 'YOUR_CSV_URL';
 
+// ==========================================
+// ตั้งค่า Telegram Bot สำหรับแจ้งเตือน
+// ==========================================
+const TELEGRAM_BOT_TOKEN = '8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0';
+const TELEGRAM_CHAT_ID = '-1004384220202';
+
+// ฟังก์ชันส่งข้อความเข้า Telegram
+async function sendTelegramNotification(message) {
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        chat_id: TELEGRAM_CHAT_ID,
+        text: message,
+        parse_mode: 'HTML',
+      }),
+    });
+  } catch (error) {
+    console.error('Error sending Telegram notification:', error);
+  }
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const urlParams = new URLSearchParams(window.location.search);
   
@@ -34,79 +59,3 @@ document.addEventListener('DOMContentLoaded', () => {
     const filtered = filter === 'all' ? products : products.filter(p => p.mood === filter);
     filtered.forEach(p => {
       productList.innerHTML += `
-        <div class="card">
-          <span class="card-tag tag-${p.mood}">${p.mood}</span>
-          <img src="${p.image}" alt="${p.name}">
-          <h3>${p.name}</h3>
-          <p>${p.description}</p>
-          <div class="price">฿${p.price}</div>
-          <a href="order.html?item=${encodeURIComponent(p.name)}&price=${p.price}" class="btn" style="text-align:center;">สั่งซื้อสินค้า</a>
-        </div>
-      `;
-    });
-  }
-
-  // ==========================================
-  // ส่วนหน้าสั่งซื้อ (แก้ไขเรียงลำดับและแก้จุดผิดแล้ว)
-  // ==========================================
-  const orderForm = document.getElementById('orderForm');
-  if (orderForm) {
-    const itemInput = document.getElementById('items');
-    const totalInput = document.getElementById('total');
-    if (urlParams.has('item')) itemInput.value = urlParams.get('item');
-    if (urlParams.has('price')) totalInput.value = urlParams.get('price');
-
-    orderForm.addEventListener('submit', (e) => {
-      e.preventDefault();
-      
-      const payload = new URLSearchParams();
-      payload.append('ชื่อ-นามสกุล ผู้รับ', document.getElementById('customerName').value);
-      payload.append('เบอร์โทรศัพท์ / LINE ID', document.getElementById('contact').value);
-      payload.append('รายการสินค้า', itemInput.value);
-      
-      // แก้ไขเป็น id="address" ให้ดึงค่าช่องที่อยู่จริงๆ (ถ้าไม่มีให้เป็นค่าว่าง)
-      const addressField = document.getElementById('address');
-      payload.append('ที่อยู่สำหรับจัดส่ง', addressField ? addressField.value : '');
-      
-      payload.append('ยอดรวมทั้งสิ้น (บาท)', totalInput.value);
-      payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', document.getElementById('note').value);
-
-      const submitBtn = orderForm.querySelector('button[type="submit"]');
-      const originalText = submitBtn.innerText;
-      submitBtn.innerText = 'กำลังส่งคำสั่งซื้อ...';
-      submitBtn.disabled = true;
-
-      // ส่งข้อมูลไป Google Sheet
-      fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        mode: 'no-cors',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded'
-        },
-        body: payload.toString()
-      }).then(() => {
-        window.location.href = 'thankyou.html'; 
-      }).catch(err => {
-        console.error(err);
-        alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
-        submitBtn.innerText = originalText;
-        submitBtn.disabled = false;
-      });
-    });
-  }
-
-  // ==========================================
-  // ส่วน Admin
-  // ==========================================
-  const ordersTableBody = document.querySelector('#ordersTable tbody');
-  if (ordersTableBody) {
-    fetch(CSV_URL).then(res => res.text()).then(csv => {
-      const rows = csv.split('\n').slice(1);
-      rows.reverse().forEach(row => {
-        if (!row.trim()) return;
-        const cols = row.split(',');
-        ordersTableBody.innerHTML += `<tr>${cols.map(c => `<td>${c}</td>`).join('')}</tr>`;
-      });
-    });
-  }
-});
