@@ -4,7 +4,7 @@ const CSV_URL = 'YOUR_CSV_URL';
 // ==========================================
 // ตั้งค่า Telegram
 // ==========================================
-const TELEGRAM_BOT_TOKEN = 'ใส่โทเคนใหม่ที่ได้จาก BotFather';
+const TELEGRAM_BOT_TOKEN = '8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0';
 const TELEGRAM_CHAT_ID = '-1004384220202';
 
 // กันข้อความของลูกค้าทำ HTML ของ Telegram พัง
