@@ -6,14 +6,28 @@ const SUPABASE_ANON_KEY = "sb_publishable_w9_2JBY3zX6hMef13QfY8A_xcKdO2RZ";
 const TELEGRAM_TOKEN = "8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0";
 const TELEGRAM_CHAT_ID = "-1004384220202";
 
-// ฟังก์ชันดึง Supabase Client
-function getSupabaseClient() {
-  if (window._supabaseInstance) return window._supabaseInstance;
-  if (window.supabase && typeof window.supabase.createClient === 'function') {
-    window._supabaseInstance = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    return window._supabaseInstance;
+// ฟังก์ชันสำหรับยิง Supabase REST API โดยตรง (ไม่ต้องใช้ SDK)
+async function supabaseFetch(endpoint, options = {}) {
+  const headers = {
+    'apikey': SUPABASE_ANON_KEY,
+    'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+    'Content-Type': 'application/json',
+    ...(options.headers || {})
+  };
+  
+  const res = await fetch(`\({SUPABASE_URL}/rest/v1/\){endpoint}`, {
+    ...options,
+    headers
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    throw new Error(`Supabase API Error (\({res.status}):\){errorText}`);
   }
-  return null;
+
+  // ถ้าไม่มี Content กลับมา (เช่น 204 No Content) ให้คืนค่า array ว่าง
+  const text = await res.text();
+  return text ? JSON.parse(text) : [];
 }
 
 // กัน HTML/XSS
@@ -27,88 +41,54 @@ function esc(str) {
 
 let allProducts = [];
 
-document.addEventListener('DOMContentLoaded', async () => {
+// ฟังก์ชันหลักทำงานเมื่อหน้าเว็บพร้อม
+async function initApp() {
   const urlParams = new URLSearchParams(window.location.search);
 
   // ==========================================
   // 1. ส่วนหน้าแสดงสินค้า (Product List / Grid)
   // ==========================================
+  // ค้นหา Element สำหรับแสดงสินค้าแบบยืดหยุ่น
   const productContainer = document.getElementById('product-list') || 
                            document.getElementById('product-grid') || 
                            document.querySelector('.product-grid') ||
-                           document.getElementById('products');
+                           document.getElementById('products') ||
+                           document.querySelector('main');
 
-  if (productContainer) {
+  if (productContainer && !document.getElementById('orderForm') && !document.getElementById('ordersTable')) {
     try {
-      const client = getSupabaseClient();
-      let stockData = [];
+      // 1.1 ดึงข้อมูลสต็อกสินค้าโดยตรงจาก Supabase REST API
+      const stockData = await supabaseFetch('stock?select=*');
 
-      // 1.1 ดึงข้อมูลสต็อกสินค้าจาก Supabase
-      if (client) {
-        try {
-          const { data, error } = await client.from('stock').select('*');
-          if (!error && data) stockData = data;
-        } catch (e) {
-          console.warn('ดึงข้อมูลจาก Supabase ไม่สำเร็จ:', e);
-        }
-      }
+      if (!stockData || stockData.length === 0) {
+        productContainer.innerHTML = '
+ไม่พบรายการสินค้าในระบบ';return;}  // 1.2 แปลงข้อมูลและจัดหมวดหมู่
+  allProducts = stockData.map(s => {
+    let mood = 'Seamless';
+    const nameLower = (s.product_name || '').toLowerCase();
+    
+    if (nameLower.includes('cotton')) mood = 'Cotton';
+    else if (nameLower.includes('sport') || nameLower.includes('flex')) mood = 'Sport Flex';
+    else if (nameLower.includes('lounge') || nameLower.includes('starter') || nameLower.includes('pack')) mood = 'Lounge & Set';
+    else if (nameLower.includes('seamless') || nameLower.includes('ไร้ขอบ')) mood = 'Seamless';
 
-      // 1.2 พยายามโหลด products.json (ถ้ามี)
-      let jsonProducts = [];
-      try {
-        const res = await fetch('products.json');
-        if (res.ok) jsonProducts = await res.json();
-      } catch (e) {
-        console.log('ไม่พบ products.json ดึงข้อมูลจาก Supabase โดยตรง');
-      }
+    return {
+      name: s.product_name,
+      price: 350,
+      description: 'กางเกงชั้นในชาย BareFit สวมใส่สบาย ผ้านุ่ม ยืดหยุ่นดีเยี่ยม',
+      mood: mood,
+      quantity: Number(s.quantity ?? 0)
+    };
+  });
 
-      // 1.3 รวมข้อมูลสินค้า
-      if (jsonProducts.length > 0) {
-        allProducts = jsonProducts.map(jp => {
-          const match = stockData.find(s => s.product_name.trim().toLowerCase() === (jp.name || '').trim().toLowerCase());
-          return {
-            name: jp.name,
-            price: jp.price || 350,
-            image: jp.image || '',
-            description: jp.description || '',
-            mood: jp.mood || '',
-            quantity: match ? Number(match.quantity) : (jp.quantity ?? 10)
-          };
-        });
-      } else if (stockData.length > 0) {
-        // ใช้ข้อมูลจาก Supabase โดยตรงกรณีไม่มี products.json
-        allProducts = stockData.map(s => {
-          let mood = 'ทั่วไป';
-          const nameLower = s.product_name.toLowerCase();
-          if (nameLower.includes('seamless') || nameLower.includes('ไร้ขอบ')) mood = 'Seamless';
-          else if (nameLower.includes('cotton')) mood = 'Cotton';
-          else if (nameLower.includes('sport') || nameLower.includes('flex')) mood = 'Sport Flex';
-          else if (nameLower.includes('lounge') || nameLower.includes('starter')) mood = 'Lounge & Set';
-
-          return {
-            name: s.product_name,
-            price: 350,
-            image: '',
-            description: 'กางเกงชั้นในชาย BareFit สวมใส่สบาย ระบายอากาศได้ดี',
-            mood: mood,
-            quantity: Number(s.quantity)
-          };
-        });
-      }
-
-      // 1.4 ฟังก์ชันสำหรับวาดการ์ดสินค้า
-      window.renderProducts = function(items) {
-        if (!items || items.length === 0) {
-          productContainer.innerHTML = '
-ไม่พบรายการสินค้าในหมวดหมู่นี้';return;}    productContainer.innerHTML = items.map(p => {
-      const qty = Number(p.quantity ?? 10);
-      const isOutOfStock = qty <= 0;
-
-      return `
-${p.mood ? ${esc(p.mood)} : ''}${p.image ? `` : ''}${esc(p.name)}${p.description ? `${esc(p.description)}` : ''}฿${esc(p.price || 350)}${isOutOfStock ? '❌ สินค้าหมดสต็อก' : `คงเหลือ${qty} ชิ้น`}[${isOutOfStock ? 'สินค้าหมด' : 'สั่งซื้อสินค้า'}
-](${isOutOfStock ? 'javascript:void(0)' : order.html?item=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price || 350)}})  `;
-}).join('');
-};// แสดงสินค้าทั้งหมดเริ่มต้นconst initialMood = urlParams.get('mood') || 'all';filterProducts(initialMood);// ดักจับปุ่มกรองสินค้าบนหน้าเว็บdocument.querySelectorAll('button, .btn-filter').forEach(btn => {btn.addEventListener('click', () => {const category = btn.dataset.mood || btn.innerText.trim();filterProducts(category);});});} catch (err) {console.error(err);productContainer.innerHTML = 'เกิดข้อผิดพลาดในการโหลดสินค้า กรุณารีเฟรชหน้า';}}// ==========================================// 2. ส่วนหน้าสั่งซื้อ (#orderForm)// ==========================================const orderForm = document.getElementById('orderForm');if (orderForm) {const itemInput = document.getElementById('items');const totalInput = document.getElementById('total');if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
+  // 1.3 ฟังก์ชันวาดการ์ดสินค้า
+  window.renderProducts = function(items) {
+    if (!items || items.length === 0) {
+      productContainer.innerHTML = '
+ไม่พบรายการสินค้าในหมวดหมู่นี้';return;}    productContainer.innerHTML = `
+${items.map(p => {const qty = Number(p.quantity ?? 0);const isOutOfStock = qty <= 0;return `${esc(p.mood)}${esc(p.name)}${esc(p.description)}฿${esc(p.price)}${isOutOfStock ? '❌ สินค้าหมดสต็อก' : `คงเหลือ${qty} ชิ้น`}[${isOutOfStock ? 'สินค้าหมด' : 'สั่งซื้อสินค้า'}
+](${isOutOfStock ? 'javascript:void(0)' : order.html?item=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price)}})`;}).join('')}`;
+};// แสดงสินค้าเริ่มต้นconst initialMood = urlParams.get('mood') || 'all';filterProducts(initialMood);// ดักจับปุ่มกรองหมวดหมู่บนหน้าเว็บdocument.addEventListener('click', (e) => {const btn = e.target.closest('button, .btn-filter');if (btn) {const category = btn.dataset.mood || btn.innerText.trim();if (category) filterProducts(category);}});} catch (err) {console.error('Error:', err);productContainer.innerHTML = `เกิดข้อผิดพลาดในการดึงข้อมูลสินค้า: ${esc(err.message)}`;}}// ==========================================// 2. ส่วนหน้าสั่งซื้อ (#orderForm)// ==========================================const orderForm = document.getElementById('orderForm');if (orderForm) {const itemInput = document.getElementById('items');const totalInput = document.getElementById('total');if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
 if (urlParams.has('price') && totalInput) totalInput.value = urlParams.get('price');
 
 orderForm.addEventListener('submit', async (e) => {
@@ -131,28 +111,32 @@ orderForm.addEventListener('submit', async (e) => {
   }
 
   try {
-    const client = getSupabaseClient();
-    let stockStatusMsg = '📊 บันทึกคำสั่งซื้อเรียบร้อย';
-
-    if (client) {
-      // 2.1 บันทึกออเดอร์
-      const { error: orderErr } = await client.from('orders').insert([{
+    // 2.1 บันทึกออเดอร์ลงตาราง orders
+    await supabaseFetch('orders', {
+      method: 'POST',
+      body: JSON.stringify([{
         customer_name: customerName,
         contact: contact,
         address: address,
         item_name: itemName,
         total: total,
         note: note
-      }]);
+      }])
+    });
 
-      if (orderErr) throw new Error('บันทึกออเดอร์ไม่สำเร็จ: ' + orderErr.message);
-
-      // 2.2 ตัดสต็อกสินค้า
-      const { data: stockResult, error: stockErr } = await client.rpc('reduce_stock', { target_name: itemName });
-      stockStatusMsg = stockErr ? `⚠️ ตัดสต็อกไม่สำเร็จ: \({stockErr.message}` : `📊 สถานะสต็อก:\){stockResult}`;
+    // 2.2 เรียกฟังก์ชันตัดสต็อก reduce_stock
+    let stockStatusMsg = '📊 บันทึกคำสั่งซื้อเรียบร้อย';
+    try {
+      const stockResult = await supabaseFetch('rpc/reduce_stock', {
+        method: 'POST',
+        body: JSON.stringify({ target_name: itemName })
+      });
+      stockStatusMsg = `📊 สถานะสต็อก: ${stockResult}`;
+    } catch (stErr) {
+      stockStatusMsg = `⚠️ ตัดสต็อกไม่สำเร็จ: ${stErr.message}`;
     }
 
-    // 2.3 ส่งแจ้งเตือน Telegram
+    // 2.3 แจ้งเตือนเข้า Telegram
     const telegramMsg =
       `🛒 มีออเดอร์ใหม่เข้า! (BareFit)\n` +
       `----------------------------------\n` +
@@ -182,7 +166,5 @@ orderForm.addEventListener('submit', async (e) => {
     }
   }
 });
-}// ==========================================// 3. ส่วนหน้า Admin (#ordersTable)// ==========================================const ordersTableBody = document.querySelector('#ordersTable tbody');if (ordersTableBody) {try {const client = getSupabaseClient();if (client) {const { data: orders, error } = await client.from('orders').select('*').order('created_at', { ascending: false });    if (error) throw error;
-
-    if (!orders || orders.length === 0) {
-      ordersTableBody.innerHTML = '
+}// ==========================================// 3. ส่วนหน้า Admin (#ordersTable)// ==========================================const ordersTableBody = document.querySelector('#ordersTable tbody');if (ordersTableBody) {try {const orders = await supabaseFetch('orders?select=*&order=created_at.desc');  if (!orders || orders.length === 0) {
+    ordersTableBody.innerHTML = '
