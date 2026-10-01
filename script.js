@@ -1,6 +1,9 @@
 const SUPABASE_URL = "https://znaduzusrhntkopejfbr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_w9_2JBY3zX6hMef13QfY8A_xcKdO2RZ";
 
+const TELEGRAM_TOKEN = "8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0";
+const TELEGRAM_CHAT_ID = "-1004384220202";
+const LOW_STOCK_LIMIT = 3;
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyIW-ydWw3RXqrTwR3GwgFLaxuR0_VuUSSrYneLzw6iqoeBpqNC26DV613jhlsX912d/exec';
 const CSV_URL = 'YOUR_CSV_URL'; // ใส่ลิงก์ CSV จริงของคุณ
