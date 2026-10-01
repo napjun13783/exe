@@ -1,38 +1,36 @@
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweAN06u7PINP448CSbIajqdS3YhJ-5IuMCMK9d1a1IQn95Jc8gvSj8vRE_4SbuW1-s/exec';
-const CSV_URL = 'YOUR_CSV_URL';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxs4B_w078DH9uUKcvxFIuBMByweYvmAJhm2IK5UWDg0ubMRm1k7ZNFcY6XXW7xPPyS/exec';
+const CSV_URL = 'YOUR_CSV_URL'; // ใส่ลิงก์ CSV จริงของคุณ
 
-// ==========================================
-// ตั้งค่า Telegram
-// ⚠️ ใส่ token ใหม่ที่ได้จาก BotFather (อันเก่าต้อง revoke ก่อน)
-// ==========================================
-const TELEGRAM_BOT_TOKEN = '8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0';
-const TELEGRAM_CHAT_ID = '-1004384220202';
-
-// กันข้อความของลูกค้าทำ HTML ของ Telegram พัง
+// กัน HTML/XSS จากข้อมูลลูกค้าและข้อมูลสินค้า
 function esc(str) {
   return String(str ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
-// ส่งแจ้งเตือนเข้า Telegram (ถ้า error จะไม่ทำให้ออเดอร์พัง)
-async function sendTelegramNotification(message) {
-  try {
-    const res = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: TELEGRAM_CHAT_ID,
-        text: message,
-        parse_mode: 'HTML',
-      }),
-    });
-    const data = await res.json();
-    if (!data.ok) console.error('Telegram error:', data);
-  } catch (error) {
-    console.error('Error sending Telegram notification:', error);
+// อ่าน CSV ที่มีเครื่องหมายจุลภาคหรือขึ้นบรรทัดใหม่ใน "..." ได้
+function parseCSV(text) {
+  const rows = [];
+  let row = [], cell = '', inQuotes = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (inQuotes) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
+      else if (ch === '"') inQuotes = false;
+      else cell += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') { row.push(cell); cell = ''; }
+    else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++;
+      row.push(cell); cell = '';
+      rows.push(row); row = [];
+    } else cell += ch;
   }
+  if (cell || row.length) { row.push(cell); rows.push(row); }
+  return rows;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -42,120 +40,88 @@ document.addEventListener('DOMContentLoaded', () => {
   // ส่วนหน้าแสดงสินค้า
   // ==========================================
   const productList = document.getElementById('product-list');
-  if (productList) {
-    fetch('products.json').then(res => res.json()).then(products => {
-      const moodFilter = urlParams.get('mood') || 'all';
-      renderProducts(products, moodFilter);
-
-      const filterBar = document.getElementById('filter-bar');
-      if (filterBar) {
-        const activeBtn = filterBar.querySelector(`[data-mood="${moodFilter}"]`);
-        if (activeBtn) activeBtn.classList.add('active');
-
-        filterBar.addEventListener('click', (e) => {
-          if (e.target.tagName === 'BUTTON') {
-            filterBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-            e.target.classList.add('active');
-            renderProducts(products, e.target.dataset.mood);
-          }
-        });
-      }
-    });
-  }
 
   function renderProducts(products, filter) {
-    productList.innerHTML = '';
     const filtered = filter === 'all' ? products : products.filter(p => p.mood === filter);
-    filtered.forEach(p => {
-      productList.innerHTML += `
-        <div class="card">
-          <span class="card-tag tag-${p.mood}">${p.mood}</span>
-          <img src="${p.image}" alt="${p.name}">
-          <h3>${p.name}</h3>
-          <p>${p.description}</p>
-          <div class="price">฿${p.price}</div>
-          <a href="order.html?item=${encodeURIComponent(p.name)}&price=${p.price}" class="btn" style="text-align:center;">สั่งซื้อสินค้า</a>
-        </div>
-      `;
-    });
+    productList.innerHTML = filtered.map(p => `
+      <div class="card">
+        <span class="card-tag tag-${esc(p.mood)}">${esc(p.mood)}</span>
+        <img src="${esc(p.image)}" alt="${esc(p.name)}">
+        <h3>${esc(p.name)}</h3>
+        <p>${esc(p.description)}</p>
+        <div class="price">฿${esc(p.price)}</div>
+        <a href="order.html?item=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price)}"
+           class="btn" style="text-align:center;">สั่งซื้อสินค้า</a>
+      </div>
+    `).join('');
+  }
+
+  if (productList) {
+    fetch('products.json')
+      .then(res => {
+        if (!res.ok) throw new Error('โหลด products.json ไม่สำเร็จ');
+        return res.json();
+      })
+      .then(products => {
+        const moodFilter = urlParams.get('mood') || 'all';
+        renderProducts(products, moodFilter);
+
+        const filterBar = document.getElementById('filter-bar');
+        if (filterBar) {
+          const activeBtn = filterBar.querySelector(`[data-mood="${CSS.escape(moodFilter)}"]`);
+          if (activeBtn) activeBtn.classList.add('active');
+
+          filterBar.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+              filterBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+              e.target.classList.add('active');
+              renderProducts(products, e.target.dataset.mood);
+            }
+          });
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        productList.innerHTML = '<p>โหลดสินค้าไม่สำเร็จ กรุณารีเฟรชหน้า</p>';
+      });
   }
 
   // ==========================================
-  // ส่วนหน้าสั่งซื้อ + Google Sheet + Telegram
+  // ส่วนหน้าสั่งซื้อ (ส่งไป Apps Script ที่เดียว)
   // ==========================================
   const orderForm = document.getElementById('orderForm');
   if (orderForm) {
     const itemInput = document.getElementById('items');
     const totalInput = document.getElementById('total');
-    const quantityInput = document.getElementById('quantity'); // ช่องจำนวน (ถ้าไม่มีในหน้า จะใช้ 1)
-
-    // ราคาต่อชิ้นจาก URL
-    const unitPrice = Number(urlParams.get('price')) || 0;
-
     if (urlParams.has('item')) itemInput.value = urlParams.get('item');
-    if (urlParams.has('price')) totalInput.value = unitPrice;
-
-    // ถ้ามีช่องจำนวน ให้คำนวณยอดรวมอัตโนมัติ = ราคาต่อชิ้น x จำนวน
-    if (quantityInput && unitPrice > 0) {
-      const updateTotal = () => {
-        const qty = Math.max(1, parseInt(quantityInput.value, 10) || 1);
-        totalInput.value = unitPrice * qty;
-      };
-      quantityInput.addEventListener('input', updateTotal);
-      updateTotal();
-    }
+    if (urlParams.has('price')) totalInput.value = urlParams.get('price');
 
     orderForm.addEventListener('submit', async (e) => {
       e.preventDefault();
 
-      const customerName = document.getElementById('customerName')?.value || '-';
-      const contact = document.getElementById('contact')?.value || '-';
-      const address = document.getElementById('address')?.value || '-';
-      const itemList = itemInput?.value || '-';
-      const quantity = Math.max(1, parseInt(quantityInput?.value, 10) || 1);
-      const totalPrice = totalInput?.value || '0';
-      const note = document.getElementById('note')?.value || '-';
+      const val = (id) => document.getElementById(id)?.value.trim() || '-';
 
-      // ใช้ URLSearchParams แทน FormData เพื่อให้ Google Sheet อ่านออกแน่นอน
       const payload = new URLSearchParams();
-      payload.append('ชื่อ-นามสกุล ผู้รับ', customerName);
-      payload.append('เบอร์โทรศัพท์ / LINE ID', contact);
-      payload.append('ที่อยู่', address);
-      payload.append('รายการสินค้า', itemList);
-      payload.append('จำนวน', quantity);
-      payload.append('ยอดรวมทั้งสิ้น (บาท)', totalPrice);
-      payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', note);
+      payload.append('ชื่อ-นามสกุล ผู้รับ', val('customerName'));
+      payload.append('เบอร์โทรศัพท์ / LINE ID', val('contact'));
+      payload.append('ที่อยู่', val('address'));
+      payload.append('รายการสินค้า', itemInput?.value || '-');
+      payload.append('ยอดรวมทั้งสิ้น (บาท)', totalInput?.value || '0');
+      payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', val('note'));
 
       const submitBtn = orderForm.querySelector('button[type="submit"]');
       const originalText = submitBtn.innerText;
       submitBtn.innerText = 'กำลังส่งคำสั่งซื้อ...';
       submitBtn.disabled = true;
 
-      const telegramMessage =
-        `🛒 <b>มีออเดอร์ใหม่เข้า! (BareFit)</b>\n` +
-        `----------------------------------\n` +
-        `👤 <b>ผู้รับ:</b> ${esc(customerName)}\n` +
-        `📞 <b>ติดต่อ:</b> ${esc(contact)}\n` +
-        `📦 <b>สินค้า:</b> ${esc(itemList)}\n` +
-        `🔢 <b>จำนวน:</b> ${esc(quantity)} ชิ้น\n` +
-        `📍 <b>ที่อยู่:</b> ${esc(address)}\n` +
-        `💰 <b>ยอดรวม:</b> ${esc(totalPrice)} บาท\n` +
-        `📝 <b>หมายเหตุ:</b> ${esc(note)}\n` +
-        `----------------------------------`;
-
       try {
-        // 1. แจ้งเตือน Telegram
-        await sendTelegramNotification(telegramMessage);
-
-        // 2. บันทึกลง Google Sheet
+        // Apps Script จะบันทึกลง Sheet และแจ้ง Telegram ให้เอง
         await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
-          mode: 'no-cors', // ข้าม CORS ของ Google
+          mode: 'no-cors',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: payload.toString()
         });
-
-        // 3. สำเร็จแล้วไปหน้าขอบคุณ
         window.location.href = 'thankyou.html';
       } catch (err) {
         console.error(err);
@@ -171,13 +137,17 @@ document.addEventListener('DOMContentLoaded', () => {
   // ==========================================
   const ordersTableBody = document.querySelector('#ordersTable tbody');
   if (ordersTableBody) {
-    fetch(CSV_URL).then(res => res.text()).then(csv => {
-      const rows = csv.split('\n').slice(1);
-      rows.reverse().forEach(row => {
-        if (!row.trim()) return;
-        const cols = row.split(',');
-        ordersTableBody.innerHTML += `<tr>${cols.map(c => `<td>${c}</td>`).join('')}</tr>`;
-      });
-    });
+    fetch(CSV_URL)
+      .then(res => {
+        if (!res.ok) throw new Error('โหลด CSV ไม่สำเร็จ');
+        return res.text();
+      })
+      .then(csv => {
+        const rows = parseCSV(csv).slice(1).filter(r => r.some(c => c.trim()));
+        ordersTableBody.innerHTML = rows.reverse()
+          .map(cols => `<tr>${cols.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`)
+          .join('');
+      })
+      .catch(err => console.error(err));
   }
 });
