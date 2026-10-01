@@ -1,4 +1,4 @@
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyAOPuDUcZl2yC3LjDSYCrN_nv33IJTzJ537R3yw0TPBit8b2J_ZkPHjrpW8y_m-qDn/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyIW-ydWw3RXqrTwR3GwgFLaxuR0_VuUSSrYneLzw6iqoeBpqNC26DV613jhlsX912d/exec';
 const CSV_URL = 'YOUR_CSV_URL'; // ใส่ลิงก์ CSV จริงของคุณ
 
 // กัน HTML/XSS จากข้อมูลลูกค้าและข้อมูลสินค้า
