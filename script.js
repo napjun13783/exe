@@ -1,5 +1,9 @@
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyIW-ydWw3RXqrTwR3GwgFLaxuR0_VuUSSrYneLzw6iqoeBpqNC26DV613jhlsX912d/exec';
-const CSV_URL = 'YOUR_CSV_URL'; // ใส่ลิงก์ CSV จริงของคุณ
+// ต้องใส่ <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+// ไว้ในทุกหน้า HTML "ก่อน" script.js
+const SUPABASE_URL = 'https://znaduzusrhntkopejfbr.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_w9_2JBY3zX6hMef13QfY8A_xcKdO2RZ'; // anon key ใส่ฝั่งหน้าเว็บได้ (ความปลอดภัยอยู่ที่ RLS)
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // กัน HTML/XSS จากข้อมูลลูกค้าและข้อมูลสินค้า
 function esc(str) {
@@ -9,28 +13,6 @@ function esc(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
-}
-
-// อ่าน CSV ที่มีเครื่องหมายจุลภาคหรือขึ้นบรรทัดใหม่ใน "..." ได้
-function parseCSV(text) {
-  const rows = [];
-  let row = [], cell = '', inQuotes = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (inQuotes) {
-      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-      else if (ch === '"') inQuotes = false;
-      else cell += ch;
-    } else if (ch === '"') inQuotes = true;
-    else if (ch === ',') { row.push(cell); cell = ''; }
-    else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && text[i + 1] === '\n') i++;
-      row.push(cell); cell = '';
-      rows.push(row); row = [];
-    } else cell += ch;
-  }
-  if (cell || row.length) { row.push(cell); rows.push(row); }
-  return rows;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -56,12 +38,24 @@ document.addEventListener('DOMContentLoaded', () => {
     `).join('');
   }
 
+  async function loadProducts() {
+    // ดึงจาก Supabase ก่อน
+    const { data, error } = await sb
+      .from('products')
+      .select('*')
+      .order('id', { ascending: true });
+
+    if (!error && data) return data;
+
+    // ถ้า Supabase พลาด ใช้ products.json สำรอง
+    console.warn('โหลดจาก Supabase ไม่สำเร็จ ใช้ products.json แทน', error);
+    const res = await fetch('products.json');
+    if (!res.ok) throw new Error('โหลด products.json ไม่สำเร็จ');
+    return res.json();
+  }
+
   if (productList) {
-    fetch('products.json')
-      .then(res => {
-        if (!res.ok) throw new Error('โหลด products.json ไม่สำเร็จ');
-        return res.json();
-      })
+    loadProducts()
       .then(products => {
         const moodFilter = urlParams.get('mood') || 'all';
         renderProducts(products, moodFilter);
@@ -87,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ==========================================
-  // ส่วนหน้าสั่งซื้อ (ส่งไป Apps Script ที่เดียว)
+  // ส่วนหน้าสั่งซื้อ (บันทึกลง Supabase)
   // ==========================================
   const orderForm = document.getElementById('orderForm');
   if (orderForm) {
@@ -101,53 +95,79 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const val = (id) => document.getElementById(id)?.value.trim() || '-';
 
-      const payload = new URLSearchParams();
-      payload.append('ชื่อ-นามสกุล ผู้รับ', val('customerName'));
-      payload.append('เบอร์โทรศัพท์ / LINE ID', val('contact'));
-      payload.append('ที่อยู่', val('address'));
-      payload.append('รายการสินค้า', itemInput?.value || '-');
-      payload.append('ยอดรวมทั้งสิ้น (บาท)', totalInput?.value || '0');
-      payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', val('note'));
+      const order = {
+        customer_name: val('customerName'),
+        contact: val('contact'),
+        address: val('address'),
+        items: itemInput?.value || '-',
+        total: Number(totalInput?.value) || 0,
+        note: val('note'),
+      };
 
       const submitBtn = orderForm.querySelector('button[type="submit"]');
       const originalText = submitBtn.innerText;
       submitBtn.innerText = 'กำลังส่งคำสั่งซื้อ...';
       submitBtn.disabled = true;
 
-      try {
-        // Apps Script จะบันทึกลง Sheet และแจ้ง Telegram ให้เอง
-        await fetch(APPS_SCRIPT_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: payload.toString()
-        });
-        window.location.href = 'thankyou.html';
-      } catch (err) {
-        console.error(err);
+      // หมายเหตุ: ไม่ใส่ .select() ต่อท้าย เพราะ anon ไม่มีสิทธิ์อ่านตาราง orders
+      const { error } = await sb.from('orders').insert(order);
+
+      if (error) {
+        console.error(error);
         alert('เกิดข้อผิดพลาดในการส่งข้อมูล กรุณาลองใหม่อีกครั้ง');
         submitBtn.innerText = originalText;
         submitBtn.disabled = false;
+        return;
       }
+      window.location.href = 'thankyou.html';
     });
   }
 
   // ==========================================
-  // ส่วน Admin
+  // ส่วน Admin (ต้องล็อกอินก่อน)
   // ==========================================
   const ordersTableBody = document.querySelector('#ordersTable tbody');
   if (ordersTableBody) {
-    fetch(CSV_URL)
-      .then(res => {
-        if (!res.ok) throw new Error('โหลด CSV ไม่สำเร็จ');
-        return res.text();
-      })
-      .then(csv => {
-        const rows = parseCSV(csv).slice(1).filter(r => r.some(c => c.trim()));
-        ordersTableBody.innerHTML = rows.reverse()
-          .map(cols => `<tr>${cols.map(c => `<td>${esc(c)}</td>`).join('')}</tr>`)
-          .join('');
-      })
-      .catch(err => console.error(err));
+    (async () => {
+      let { data: { session } } = await sb.auth.getSession();
+
+      if (!session) {
+        const email = prompt('อีเมลแอดมิน');
+        const password = email ? prompt('รหัสผ่าน') : null;
+        if (!email || !password) {
+          ordersTableBody.innerHTML = '<tr><td colspan="8">กรุณาล็อกอินเพื่อดูออเดอร์</td></tr>';
+          return;
+        }
+        const { error: authError } = await sb.auth.signInWithPassword({ email, password });
+        if (authError) {
+          alert('ล็อกอินไม่สำเร็จ: ' + authError.message);
+          return;
+        }
+      }
+
+      const { data, error } = await sb
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error(error);
+        ordersTableBody.innerHTML = '<tr><td colspan="8">โหลดออเดอร์ไม่สำเร็จ</td></tr>';
+        return;
+      }
+
+      // ลำดับคอลัมน์ต้องตรงกับหัวตารางใน admin.html
+      ordersTableBody.innerHTML = data.map(o => `
+        <tr>
+          <td>${esc(new Date(o.created_at).toLocaleString('th-TH'))}</td>
+          <td>${esc(o.customer_name)}</td>
+          <td>${esc(o.contact)}</td>
+          <td>${esc(o.address)}</td>
+          <td>${esc(o.items)}</td>
+          <td>${esc(o.total)}</td>
+          <td>${esc(o.note)}</td>
+        </tr>
+      `).join('');
+    })();
   }
 });
