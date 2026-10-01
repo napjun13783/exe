@@ -31,65 +31,84 @@ document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
 
   // ==========================================
-  // 1. ส่วนหน้าแสดงสินค้า
+  // 1. ส่วนหน้าแสดงสินค้า (Product List / Grid)
   // ==========================================
   const productContainer = document.getElementById('product-list') || 
                            document.getElementById('product-grid') || 
+                           document.querySelector('.product-grid') ||
                            document.getElementById('products');
 
   if (productContainer) {
     try {
-      // 1.1 โหลดข้อมูลสินค้าหลักจาก products.json
-      let productsData = [];
-      try {
-        const res = await fetch('products.json');
-        if (res.ok) {
-          productsData = await res.json();
-        }
-      } catch (e) {
-        console.warn('ไม่สามารถโหลด products.json ได้:', e);
-      }
-
-      // 1.2 ดึงข้อมูลสต็อกจริงจาก Supabase
-      let stockMap = {};
       const client = getSupabaseClient();
+      let stockData = [];
+
+      // 1.1 ดึงข้อมูลสต็อกสินค้าจาก Supabase
       if (client) {
         try {
-          const { data: stockData } = await client.from('stock').select('*');
-          if (stockData) {
-            stockData.forEach(item => {
-              if (item.product_name) {
-                stockMap[item.product_name.trim().toLowerCase()] = Number(item.quantity);
-              }
-            });
-          }
+          const { data, error } = await client.from('stock').select('*');
+          if (!error && data) stockData = data;
         } catch (e) {
           console.warn('ดึงข้อมูลจาก Supabase ไม่สำเร็จ:', e);
         }
       }
 
-      // 1.3 ผสานข้อมูลสินค้า + จำนวนสต็อก
-      if (productsData.length > 0) {
-        allProducts = productsData.map(p => {
-          const key = (p.name || '').trim().toLowerCase();
-          const stockQty = stockMap[key] !== undefined ? stockMap[key] : (p.quantity ?? 10);
-          return { ...p, quantity: stockQty };
+      // 1.2 พยายามโหลด products.json (ถ้ามี)
+      let jsonProducts = [];
+      try {
+        const res = await fetch('products.json');
+        if (res.ok) jsonProducts = await res.json();
+      } catch (e) {
+        console.log('ไม่พบ products.json ดึงข้อมูลจาก Supabase โดยตรง');
+      }
+
+      // 1.3 รวมข้อมูลสินค้า
+      if (jsonProducts.length > 0) {
+        allProducts = jsonProducts.map(jp => {
+          const match = stockData.find(s => s.product_name.trim().toLowerCase() === (jp.name || '').trim().toLowerCase());
+          return {
+            name: jp.name,
+            price: jp.price || 350,
+            image: jp.image || '',
+            description: jp.description || '',
+            mood: jp.mood || '',
+            quantity: match ? Number(match.quantity) : (jp.quantity ?? 10)
+          };
+        });
+      } else if (stockData.length > 0) {
+        // ใช้ข้อมูลจาก Supabase โดยตรงกรณีไม่มี products.json
+        allProducts = stockData.map(s => {
+          let mood = 'ทั่วไป';
+          const nameLower = s.product_name.toLowerCase();
+          if (nameLower.includes('seamless') || nameLower.includes('ไร้ขอบ')) mood = 'Seamless';
+          else if (nameLower.includes('cotton')) mood = 'Cotton';
+          else if (nameLower.includes('sport') || nameLower.includes('flex')) mood = 'Sport Flex';
+          else if (nameLower.includes('lounge') || nameLower.includes('starter')) mood = 'Lounge & Set';
+
+          return {
+            name: s.product_name,
+            price: 350,
+            image: '',
+            description: 'กางเกงชั้นในชาย BareFit สวมใส่สบาย ระบายอากาศได้ดี',
+            mood: mood,
+            quantity: Number(s.quantity)
+          };
         });
       }
 
-      // ฟังก์ชันสำหรับแสดงผลการ์ดสินค้า
+      // 1.4 ฟังก์ชันสำหรับวาดการ์ดสินค้า
       window.renderProducts = function(items) {
         if (!items || items.length === 0) {
           productContainer.innerHTML = '
 ไม่พบรายการสินค้าในหมวดหมู่นี้';return;}    productContainer.innerHTML = items.map(p => {
-      const qty = p.quantity !== undefined ? p.quantity : 10;
+      const qty = Number(p.quantity ?? 10);
       const isOutOfStock = qty <= 0;
 
       return `
 ${p.mood ? ${esc(p.mood)} : ''}${p.image ? `` : ''}${esc(p.name)}${p.description ? `${esc(p.description)}` : ''}฿${esc(p.price || 350)}${isOutOfStock ? '❌ สินค้าหมดสต็อก' : `คงเหลือ${qty} ชิ้น`}[${isOutOfStock ? 'สินค้าหมด' : 'สั่งซื้อสินค้า'}
-](${isOutOfStock ? '#' : order.html?item=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price || 350)}})  `;
+](${isOutOfStock ? 'javascript:void(0)' : order.html?item=${encodeURIComponent(p.name)}&price=${encodeURIComponent(p.price || 350)}})  `;
 }).join('');
-};// แสดงสินค้าทั้งหมดconst initialMood = urlParams.get('mood') || 'all';filterProducts(initialMood);// ดักจับเหตุการณ์การกดปุ่มกรอง (Filter)const filterBar = document.getElementById('filter-bar') || document.querySelector('.filter-bar');if (filterBar) {filterBar.addEventListener('click', (e) => {if (e.target.tagName === 'BUTTON') {filterBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));e.target.classList.add('active');const selectedMood = e.target.dataset.mood || e.target.innerText.trim();filterProducts(selectedMood);}});}} catch (err) {console.error(err);productContainer.innerHTML = 'เกิดข้อผิดพลาดในการโหลดสินค้า กรุณารีเฟรชหน้า';}}// ==========================================// 2. ส่วนหน้าสั่งซื้อ (#orderForm)// ==========================================const orderForm = document.getElementById('orderForm');if (orderForm) {const itemInput = document.getElementById('items');const totalInput = document.getElementById('total');if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
+};// แสดงสินค้าทั้งหมดเริ่มต้นconst initialMood = urlParams.get('mood') || 'all';filterProducts(initialMood);// ดักจับปุ่มกรองสินค้าบนหน้าเว็บdocument.querySelectorAll('button, .btn-filter').forEach(btn => {btn.addEventListener('click', () => {const category = btn.dataset.mood || btn.innerText.trim();filterProducts(category);});});} catch (err) {console.error(err);productContainer.innerHTML = 'เกิดข้อผิดพลาดในการโหลดสินค้า กรุณารีเฟรชหน้า';}}// ==========================================// 2. ส่วนหน้าสั่งซื้อ (#orderForm)// ==========================================const orderForm = document.getElementById('orderForm');if (orderForm) {const itemInput = document.getElementById('items');const totalInput = document.getElementById('total');if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
 if (urlParams.has('price') && totalInput) totalInput.value = urlParams.get('price');
 
 orderForm.addEventListener('submit', async (e) => {
@@ -116,7 +135,7 @@ orderForm.addEventListener('submit', async (e) => {
     let stockStatusMsg = '📊 บันทึกคำสั่งซื้อเรียบร้อย';
 
     if (client) {
-      // 2.1 บันทึกออเดอร์ลงตาราง orders
+      // 2.1 บันทึกออเดอร์
       const { error: orderErr } = await client.from('orders').insert([{
         customer_name: customerName,
         contact: contact,
