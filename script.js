@@ -1,8 +1,18 @@
-// 1. เชื่อมต่อ Supabase
+// 1. ตั้งค่าการเชื่อมต่อ Supabase
 const SUPABASE_URL = "https://znaduzusrhntkopejfbr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_w9_2JBY3zX6hMef13QfY8A_xcKdO2RZ";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+// ฟังก์ชันสำหรับเรียกใช้ Supabase Client แบบปลอดภัย (ป้องกันปัญหาโหลด SDK ไม่ทัน)
+function getSupabaseClient() {
+  if (window._supabaseInstance) return window._supabaseInstance;
+
+  if (window.supabase && typeof window.supabase.createClient === 'function') {
+    window._supabaseInstance = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    return window._supabaseInstance;
+  }
+
+  throw new Error("ไม่พบ Supabase SDK กรุณาตรวจสอบว่ามี  ในไฟล์ HTML แล้วหรือยัง");
+}
 
 // 2. ตั้งค่า Telegram แจ้งเตือน
 const TELEGRAM_TOKEN = "8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0";
@@ -12,6 +22,8 @@ const LOW_STOCK_LIMIT = 3;
 // 3. ฟังก์ชันประมวลผลคำสั่งซื้อ
 async function handleOrderSubmit(orderData) {
   try {
+    const client = getSupabaseClient();
+
     const name = orderData['ชื่อ-นามสกุล ผู้รับ'] || orderData.name || 'ลูกค้าหน้าร้าน (POS)';
     const contact = orderData['เบอร์โทรศัพท์ / LINE ID'] || orderData.phone || '-';
     const address = orderData['ที่อยู่'] || orderData.address || '-';
@@ -20,7 +32,7 @@ async function handleOrderSubmit(orderData) {
     const note = orderData['ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม'] || orderData.note || '-';
 
     // 3.1 บันทึกลงตาราง orders
-    const { error: orderErr } = await supabase
+    const { error: orderErr } = await client
       .from('orders')
       .insert([{ customer_name: name, contact: contact, item_name: item, total: total, note: note, address: address }]);
 
@@ -28,7 +40,8 @@ async function handleOrderSubmit(orderData) {
 
     // 3.2 ค้นหาและตัดสต็อกในตาราง stock
     let stockInfo = '';
-    const { data: stockData } = await supabase.from('stock').select('*');
+    const { data: stockData, error: stockErr } = await client.from('stock').select('*');
+    if (stockErr) throw stockErr;
 
     const target = stockData?.find(s => 
       s.product_name.trim() === item || 
@@ -43,10 +56,10 @@ async function handleOrderSubmit(orderData) {
         stockInfo = '🚨 สินค้าหมดสต็อกอยู่แล้ว!';
       } else {
         const remain = currentQty - 1;
-        await supabase.from('stock').update({ quantity: remain }).eq('id', target.id);
+        await client.from('stock').update({ quantity: remain }).eq('id', target.id);
 
         if (remain === 0) stockInfo = '🚨 สินค้าหมดสต็อกแล้ว!';
-        else if (remain <= LOW_STOCK_LIMIT) stockInfo = `⚠️ เตือนสต็อกต่ำ! เหลือเพียง ${remain} ชิ้น`;
+        else if (remain <= LOW_STOCK_LIMIT) stockInfo = `⚠️️ เตือนสต็อกต่ำ! เหลือเพียง ${remain} ชิ้น`;
         else stockInfo = `📊 คงเหลือ ${remain} ชิ้น`;
       }
     }
