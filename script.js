@@ -45,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .select('*')
       .order('id', { ascending: true });
 
-    if (!error && data) return data;
+    if (!error && data && data.length > 0) return data;
 
     // ถ้า Supabase พลาด ใช้ products.json สำรอง
     console.warn('โหลดจาก Supabase ไม่สำเร็จ ใช้ products.json แทน', error);
