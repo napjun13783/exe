@@ -1,7 +1,6 @@
 const SUPABASE_URL = "https://znaduzusrhntkopejfbr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_w9_2JBY3zX6hMef13QfY8A_xcKdO2RZ";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyIW-ydWw3RXqrTwR3GwgFLaxuR0_VuUSSrYneLzw6iqoeBpqNC26DV613jhlsX912d/exec';
 const CSV_URL = 'YOUR_CSV_URL'; // ใส่ลิงก์ CSV จริงของคุณ
