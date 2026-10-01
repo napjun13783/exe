@@ -1,4 +1,4 @@
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxs4B_w078DH9uUKcvxFIuBMByweYvmAJhm2IK5UWDg0ubMRm1k7ZNFcY6XXW7xPPyS/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbweAN06u7PINP448CSbIajqdS3YhJ-5IuMCMK9d1a1IQn95Jc8gvSj8vRE_4SbuW1-s/exec';
 const CSV_URL = 'YOUR_CSV_URL';
 
 // ==========================================
