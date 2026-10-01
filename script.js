@@ -16,7 +16,7 @@ function getSupabaseClient() {
   throw new Error("ไม่พบ Supabase SDK กรุณาใส่  ในส่วน  ของ HTML");
 }
 
-// กัน HTML/XSS จากข้อมูลลูกค้าและข้อมูลสินค้า
+// ป้องกัน HTML/XSS
 function esc(str) {
   return String(str ?? '')
     .replace(/&/g, '&')
@@ -25,39 +25,33 @@ function esc(str) {
     .replace(/'/g, ''');
 }
 
+let allProducts = [];
+
 document.addEventListener('DOMContentLoaded', async () => {
   const urlParams = new URLSearchParams(window.location.search);
 
   // ==========================================
-  // 1. ส่วนหน้าแสดงสินค้า (#product-list)
+  // 1. ส่วนหน้าแสดงสินค้า (รองรับทั้ง product-grid และ product-list)
   // ==========================================
-  const productList = document.getElementById('product-list');
+  const productContainer = document.getElementById('product-grid') || document.getElementById('product-list');
 
-  if (productList) {
+  if (productContainer) {
     try {
       const client = getSupabaseClient();
       const { data: products, error } = await client.from('stock').select('*');
       if (error) throw error;
 
-      function renderProducts(items, filter) {
-        const filtered = filter === 'all' 
-          ? items 
-          : items.filter(p => p.product_name.toLowerCase().includes(filter.toLowerCase()));
+      allProducts = products || [];
 
-        if (filtered.length === 0) {
-          productList.innerHTML = '
-ไม่พบรายการสินค้า';return;}    productList.innerHTML = filtered.map(p => `
-${esc(p.product_name)}${p.quantity > 0 ? `คงเหลือ${p.quantity} ชิ้น` : 'สินค้าหมดสต็อก'}
+      // ฟังก์ชันวาดการ์ดสินค้า
+      window.renderProducts = function(items) {
+        if (!items || items.length === 0) {
+          productContainer.innerHTML = '
+ไม่พบรายการสินค้า';return;}    productContainer.innerHTML = items.map(p => `
+${esc(p.product_name)}${p.quantity > 0 ? `คงเหลือ${p.quantity} ชิ้น` : 'สินค้าหมด'}
 ${p.quantity > 0 ? 'สั่งซื้อสินค้า' : 'สินค้าหมด'}
 `).join('');
-}const moodFilter = urlParams.get('mood') || 'all';renderProducts(products, moodFilter);const filterBar = document.getElementById('filter-bar');if (filterBar) {const activeBtn = filterBar.querySelector([data-mood="${CSS.escape(moodFilter)}"]);if (activeBtn) activeBtn.classList.add('active');filterBar.addEventListener('click', (e) => {
-  if (e.target.tagName === 'BUTTON') {
-    filterBar.querySelectorAll('button').forEach(b => b.classList.remove('active'));
-    e.target.classList.add('active');
-    renderProducts(products, e.target.dataset.mood);
-  }
-});
-}} catch (err) {console.error(err);productList.innerHTML = 'โหลดสินค้าไม่สำเร็จ กรุณารีเฟรชหน้าใหม่อีกครั้ง';}}// ==========================================// 2. ส่วนหน้าสั่งซื้อ (#orderForm)// ==========================================const orderForm = document.getElementById('orderForm');if (orderForm) {const itemInput = document.getElementById('items');const totalInput = document.getElementById('total');if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
+};// โหลดและกรองสินค้าตาม URLconst initialMood = urlParams.get('mood') || 'all';window.filterProducts(initialMood);} catch (err) {console.error(err);productContainer.innerHTML = `เกิดข้อผิดพลาดในการโหลดสินค้า: ${esc(err.message)}`;}}// ==========================================// 2. ส่วนหน้าสั่งซื้อ (#orderForm)// ==========================================const orderForm = document.getElementById('orderForm');if (orderForm) {const itemInput = document.getElementById('items');const totalInput = document.getElementById('total');if (urlParams.has('item') && itemInput) itemInput.value = urlParams.get('item');
 if (urlParams.has('price') && totalInput) totalInput.value = urlParams.get('price');
 
 orderForm.addEventListener('submit', async (e) => {
@@ -82,7 +76,7 @@ orderForm.addEventListener('submit', async (e) => {
   try {
     const client = getSupabaseClient();
 
-    // 2.1 บันทึกออเดอร์ลงตาราง orders ใน Supabase
+    // 2.1 บันทึกออเดอร์
     const { error: orderErr } = await client.from('orders').insert([{
       customer_name: customerName,
       contact: contact,
@@ -94,11 +88,11 @@ orderForm.addEventListener('submit', async (e) => {
 
     if (orderErr) throw new Error('บันทึกออเดอร์ลง Supabase ไม่สำเร็จ: ' + orderErr.message);
 
-    // 2.2 เรียกใช้ฟังก์ชันตัดสต็อกใน Supabase
+    // 2.2 เรียกฟังก์ชันตัดสต็อก
     const { data: stockResult, error: stockErr } = await client.rpc('reduce_stock', { target_name: itemName });
-    const stockStatusMsg = stockErr ? `⚠️ ตัดสต็อกไม่สำเร็จ: \({stockErr.message}` : `📊 สถานะสต็อก:\){stockResult}`;
+    const stockStatusMsg = stockErr ? `⚠️️ ตัดสต็อกไม่สำเร็จ: \({stockErr.message}` : `📊 สถานะสต็อก:\){stockResult}`;
 
-    // 2.3 ส่งข้อความแจ้งเตือนเข้า Telegram
+    // 2.3 แจ้ง Telegram
     const telegramMsg =
       `🛒 มีออเดอร์ใหม่เข้า! (BareFit)\n` +
       `----------------------------------\n` +
@@ -117,7 +111,6 @@ orderForm.addEventListener('submit', async (e) => {
       body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: telegramMsg })
     });
 
-    // 2.4 เปลี่ยนหน้าไปขอบคุณลูกค้า
     window.location.href = 'thankyou.html';
 
   } catch (err) {
