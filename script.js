@@ -3,6 +3,7 @@ const CSV_URL = 'YOUR_CSV_URL';
 
 // ==========================================
 // ตั้งค่า Telegram
+// ⚠️ ใส่ token ใหม่ที่ได้จาก BotFather (อันเก่าต้อง revoke ก่อน)
 // ==========================================
 const TELEGRAM_BOT_TOKEN = '8885002492:AAGTW9aV89PosCdYSY33Lhf_qZR5HMui1P0';
 const TELEGRAM_CHAT_ID = '-1004384220202';
@@ -86,8 +87,23 @@ document.addEventListener('DOMContentLoaded', () => {
   if (orderForm) {
     const itemInput = document.getElementById('items');
     const totalInput = document.getElementById('total');
+    const quantityInput = document.getElementById('quantity'); // ช่องจำนวน (ถ้าไม่มีในหน้า จะใช้ 1)
+
+    // ราคาต่อชิ้นจาก URL
+    const unitPrice = Number(urlParams.get('price')) || 0;
+
     if (urlParams.has('item')) itemInput.value = urlParams.get('item');
-    if (urlParams.has('price')) totalInput.value = urlParams.get('price');
+    if (urlParams.has('price')) totalInput.value = unitPrice;
+
+    // ถ้ามีช่องจำนวน ให้คำนวณยอดรวมอัตโนมัติ = ราคาต่อชิ้น x จำนวน
+    if (quantityInput && unitPrice > 0) {
+      const updateTotal = () => {
+        const qty = Math.max(1, parseInt(quantityInput.value, 10) || 1);
+        totalInput.value = unitPrice * qty;
+      };
+      quantityInput.addEventListener('input', updateTotal);
+      updateTotal();
+    }
 
     orderForm.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -96,6 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const contact = document.getElementById('contact')?.value || '-';
       const address = document.getElementById('address')?.value || '-';
       const itemList = itemInput?.value || '-';
+      const quantity = Math.max(1, parseInt(quantityInput?.value, 10) || 1);
       const totalPrice = totalInput?.value || '0';
       const note = document.getElementById('note')?.value || '-';
 
@@ -105,6 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
       payload.append('เบอร์โทรศัพท์ / LINE ID', contact);
       payload.append('ที่อยู่', address);
       payload.append('รายการสินค้า', itemList);
+      payload.append('จำนวน', quantity);
       payload.append('ยอดรวมทั้งสิ้น (บาท)', totalPrice);
       payload.append('ไซส์ที่ต้องการ / หมายเหตุเพิ่มเติม', note);
 
@@ -119,6 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
         `👤 <b>ผู้รับ:</b> ${esc(customerName)}\n` +
         `📞 <b>ติดต่อ:</b> ${esc(contact)}\n` +
         `📦 <b>สินค้า:</b> ${esc(itemList)}\n` +
+        `🔢 <b>จำนวน:</b> ${esc(quantity)} ชิ้น\n` +
         `📍 <b>ที่อยู่:</b> ${esc(address)}\n` +
         `💰 <b>ยอดรวม:</b> ${esc(totalPrice)} บาท\n` +
         `📝 <b>หมายเหตุ:</b> ${esc(note)}\n` +
@@ -131,7 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 2. บันทึกลง Google Sheet
         await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
-          mode: 'no-cors',
+          mode: 'no-cors', // ข้าม CORS ของ Google
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: payload.toString()
         });
