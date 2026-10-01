@@ -2,7 +2,6 @@
 const SUPABASE_URL = "https://znaduzusrhntkopejfbr.supabase.co";
 const SUPABASE_ANON_KEY = "sb_publishable_w9_2JBY3zX6hMef13QfY8A_xcKdO2RZ";
 
-// ฟังก์ชันเรียกใช้ Supabase Client ป้องกันการโหลด SDK ไม่ทัน
 function getSupabaseClient() {
   if (window._supabaseInstance) return window._supabaseInstance;
 
@@ -36,27 +35,34 @@ async function handleOrderSubmit(orderData) {
       .from('orders')
       .insert([{ customer_name: name, contact: contact, item_name: item, total: total, note: note, address: address }]);
 
-    if (orderErr) throw orderErr;
+    if (orderErr) throw new Error('บันทึกออเดอร์ไม่สำเร็จ: ' + orderErr.message);
 
     // 3.2 ค้นหาและตัดสต็อกในตาราง stock
     let stockInfo = '';
     const { data: stockData, error: stockErr } = await client.from('stock').select('*');
-    if (stockErr) throw stockErr;
+    if (stockErr) throw new Error('ดึงข้อมูลสต็อกไม่สำเร็จ: ' + stockErr.message);
 
     const target = stockData?.find(s => 
-      s.product_name.trim() === item || 
+      s.product_name.trim().toLowerCase() === item.toLowerCase() || 
       (item !== '' && s.product_name.toLowerCase().includes(item.toLowerCase()))
     );
 
     if (!target) {
-      stockInfo = `⚠️️ ไม่พบสินค้า "${item}" ในตาราง Stock`;
+      stockInfo = `⚠️ ไม่พบสินค้า "${item}" ในตาราง Stock`;
     } else {
-      const currentQty = target.quantity;
+      const currentQty = Number(target.quantity) || 0;
       if (currentQty <= 0) {
         stockInfo = '🚨 สินค้าหมดสต็อกอยู่แล้ว!';
       } else {
         const remain = currentQty - 1;
-        await client.from('stock').update({ quantity: remain }).eq('id', target.id);
+        
+        // อัปเดตตัดสต็อกลงตาราง stock พร้อมตรวจสอบ Error
+        const { error: updateErr } = await client
+          .from('stock')
+          .update({ quantity: remain })
+          .eq('id', target.id);
+
+        if (updateErr) throw new Error('ตัดสต็อกไม่สำเร็จ: ' + updateErr.message);
 
         if (remain === 0) stockInfo = '🚨 สินค้าหมดสต็อกแล้ว!';
         else if (remain <= LOW_STOCK_LIMIT) stockInfo = `⚠️ เตือนสต็อกต่ำ! เหลือเพียง ${remain} ชิ้น`;
@@ -85,7 +91,6 @@ async function handleOrderSubmit(orderData) {
 
     alert('สั่งซื้อและบันทึกข้อมูลเรียบร้อยแล้ว!');
     
-    // โหลดหน้ารายการสินค้าใหม่เพื่ออัปเดตจำนวนสต็อกบนหน้าจอ (ถ้าเปิดอยู่ที่ product.html)
     if (typeof loadProductsFromSupabase === 'function') {
       loadProductsFromSupabase();
     }
